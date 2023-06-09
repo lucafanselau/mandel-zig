@@ -24,7 +24,11 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    _ = b.addModule("zigimg", .{ .source_file = std.Build.FileSource.relative("libs/zigimg/zigimg.zig") });
+    // _ = exe.addModule("zigimg", .{ .source_file = std.Build.FileSource.relative("libs/zigimg/zigimg.zig") });
+
+    const img = b.createModule(.{ .source_file = std.build.FileSource.relative("libs/zigimg/zigimg.zig") });
+
+    exe.addModule("zigimg", img); // THE "raylib" here is how you import raylib into other .zig files. const r = @import("raylib");
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default

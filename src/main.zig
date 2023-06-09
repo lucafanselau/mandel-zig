@@ -13,29 +13,19 @@ const Pixel = struct {
     b: u8,
 
     pub fn zero() Pixel {
-        return Pixel {
-            .r = 0,
-            .g = 0,
-            .b = 0
-        };
+        return Pixel{ .r = 0, .g = 0, .b = 0 };
     }
 
     pub fn rand() Pixel {
-        return Pixel {
-            .r = random_u8(),
-            .g = random_u8(),
-            .b = random_u8()
-        };
+        return Pixel{ .r = random_u8(), .g = random_u8(), .b = random_u8() };
     }
 
-
     pub fn write(self: Pixel, writer: anytype) !void {
-        try fmt.format(writer, "{} {} {} ", .{self.r, self.g, self.b});
+        try fmt.format(writer, "{} {} {} ", .{ self.r, self.g, self.b });
     }
 };
 
 fn write_file(comptime width: u32, comptime height: u32, pixels: [height][width]Pixel) !void {
-
     const file = try std.fs.cwd().createFile("./image.ppm", .{ .read = false });
     defer file.close();
 
@@ -47,19 +37,10 @@ fn write_file(comptime width: u32, comptime height: u32, pixels: [height][width]
         }
         try file.writer().print("\n", .{});
     }
-
 }
 
 // mandelbrot algorithm
-    const config = .{
-         .xmin = -2.0,
- .xmax = 0.6,
- 
- .ymin  = -1.5,
- .ymax  = 1.5,
-
- .MAX_ITERS = 200
-    };
+const config = .{ .xmin = -2.0, .xmax = 0.6, .ymin = -1.5, .ymax = 1.5, .MAX_ITERS = 200 };
 
 fn complex_norm(c: *std.math.Complex(f64)) f64 {
     return c.re * c.re + c.im * c.im;
@@ -67,8 +48,8 @@ fn complex_norm(c: *std.math.Complex(f64)) f64 {
 
 fn mandelbrot_kernel(complex: std.math.Complex(f64)) usize {
     var z = std.math.Complex(f64).init(complex.re, complex.im);
-    
-        //std.debug.print("{} {} {}\n", .{z.re, z.im, complex_norm(&z)});
+
+    //std.debug.print("{} {} {}\n", .{z.re, z.im, complex_norm(&z)});
     for (0..config.MAX_ITERS) |i| {
         z = z.mul(z).add(complex);
         if (complex_norm(&z) > 4) {
@@ -78,44 +59,42 @@ fn mandelbrot_kernel(complex: std.math.Complex(f64)) usize {
     return config.MAX_ITERS;
 }
 
-fn mandelbrot_pixel(complex: std.math.Complex(f64)) Pixel {
+fn mandelbrot_pixel(complex: std.math.Complex(f64)) zigimg.color.Grayscale(u8) {
     const i = mandelbrot_kernel(complex);
     const grayscale = @floatToInt(u8, 255.0 * @intToFloat(f64, i) / @intToFloat(f64, config.MAX_ITERS));
 
     // std.debug.print("{} {} \n", .{grayscale, complex});
 
-    return Pixel {
-        .r = grayscale,
-        .g = grayscale,
-        .b = grayscale
-    };
+    // return Pixel {
+    //     .r = grayscale,
+    //     .g = grayscale,
+    //     .b = grayscale
+    // };
+    return zigimg.color.Grayscale(u8){ .value = grayscale };
 }
 
+var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+const allocator = gpa.allocator();
 fn build_img(comptime width: u32, comptime height: u32) !void {
+    var img = try zigimg.Image.create(allocator, width, height, zigimg.PixelFormat.grayscale8);
+    defer img.deinit();
 
-    var pixels = [1][width]Pixel{[_]Pixel{ Pixel.zero() } ** width} ** height;
-
-    
-
-const dy = (config.ymax - config.ymin) / @intToFloat(f64, height);
-const dx = (config.xmax - config.xmin) / @intToFloat(f64, width);
-
+    const dy = (config.ymax - config.ymin) / @intToFloat(f64, height);
+    const dx = (config.xmax - config.xmin) / @intToFloat(f64, width);
 
     for (0..height) |j| {
         var y = config.ymin + (@intToFloat(f64, j) * dy);
         for (0..width) |i| {
-            var x =  config.xmin + (@intToFloat(f64, i) * dx);
- //std.debug.print("{} {} {} {} {} {}\n", .{i, j, x, y, dy, dx});
-            pixels[j][i] = mandelbrot_pixel(std.math.Complex(f64).init(x, y));
+            var x = config.xmin + (@intToFloat(f64, i) * dx);
+            //std.debug.print("{} {} {} {} {} {}\n", .{i, j, x, y, dy, dx});
 
+            // pixels[j][i] = mandelbrot_pixel(std.math.Complex(f64).init(x, y));
+            img.pixels.grayscale8[j * width + i] = mandelbrot_pixel(std.math.Complex(f64).init(x, y));
         }
     }
 
-
-
-    try write_file(width, height, pixels);
-
-
+    //  try write_file(width, height, pixels);
+    try img.writeToFilePath("output.png", .{ .png = .{} });
 }
 
 pub fn main() !void {
